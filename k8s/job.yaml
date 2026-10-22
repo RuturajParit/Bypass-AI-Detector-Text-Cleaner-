@@ -1,0 +1,20 @@
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: text-cleaner
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 180
+  template:
+    metadata:
+      labels:
+        app: text-cleaner
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: cleaner
+          image: DOCKERHUB_USERNAME/cca2-text-cleaner:latest
+          imagePullPolicy: Always
+          workingDir: /app
+          command: ["python", "-u", "src/cleaner.py"]
