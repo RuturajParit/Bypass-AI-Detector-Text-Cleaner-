@@ -14,7 +14,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: cleaner
-          image: DOCKERHUB_USERNAME/cca2-text-cleaner:latest
+          image: ruturajparit/cca2-text-cleaner:latest
           imagePullPolicy: Always
           workingDir: /app
           command: ["python", "-u", "src/cleaner.py"]
