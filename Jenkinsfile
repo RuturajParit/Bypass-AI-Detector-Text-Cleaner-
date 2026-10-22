@@ -1,7 +1,6 @@
-```groovy
 stage('Run on Kubernetes') {
     steps {
-        sh '''
+        sh
             set -eu
 
             kubectl delete job text-cleaner --ignore-not-found=true --wait=true
@@ -50,6 +49,6 @@ stage('Run on Kubernetes') {
 
             echo "=== RESULT FILE ==="
             cat output/clean_assignment.txt
-        '''
+      
     }
 }
