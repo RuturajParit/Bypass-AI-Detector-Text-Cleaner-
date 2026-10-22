@@ -60,8 +60,7 @@ pipeline {
                     kubectl delete job text-cleaner \
                       --ignore-not-found=true --wait=true
 
-                    sed "s|DOCKERHUB_USERNAME/cca2-text-cleaner:latest|$IMAGE:$BUILD_NUMBER|g" \
-                      k8s/job.yaml | kubectl apply -f -
+                    sed "s|image: .*|image: $IMAGE:$BUILD_NUMBER|" k8s/job.yaml | kubectl apply -f -
 
                     kubectl wait \
                       --for=condition=complete \
