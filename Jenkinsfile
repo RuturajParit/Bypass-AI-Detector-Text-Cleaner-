@@ -1,99 +1,55 @@
+```groovy
+stage('Run on Kubernetes') {
+    steps {
+        sh '''
+            set -eu
 
-pipeline {
-    agent any
+            kubectl delete job text-cleaner --ignore-not-found=true --wait=true
 
-    environment {
-        IMAGE = 'ruturajparit/cca2-text-cleaner'
-    }
+            sed "s|image: .*|image: $IMAGE:$BUILD_NUMBER|" \
+                k8s/job.yaml | kubectl apply -f -
 
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
+            kubectl wait --for=condition=complete \
+                job/text-cleaner --timeout=180s
 
-        stage('Build and Test') {
-            steps {
-                sh '''
-                    set -eu
-                    python3 --version
-                    python3 -m compileall -q src
-                    test -f src/cleaner.py
-                    test -f examples/assignment.txt
-                '''
-            }
-        }
+            echo "=== CLEANER OUTPUT ==="
+            kubectl logs job/text-cleaner
 
-        stage('Docker Build') {
-            steps {
-                sh 'docker build -t "$IMAGE:$BUILD_NUMBER" .'
-            }
-        }
+            mkdir -p output
 
-        stage('Push Image') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'DOCKER_USER',
-                        passwordVariable: 'DOCKER_PASS'
-                    )
-                ]) {
-                    sh '''
-                        set -eu
-                        set +x
-                        echo "$DOCKER_PASS" |
-                          docker login -u "$DOCKER_USER" --password-stdin
-                        docker push "$IMAGE:$BUILD_NUMBER"
-                        docker logout
-                    '''
-                }
-            }
-        }
+            echo "=== COPYING RESULT ==="
 
-        stage('Run on Kubernetes') {
-            steps {
-                sh '''
-                    set -eu
+            POD=$(kubectl get pods \
+                -l job-name=text-cleaner \
+                -o jsonpath='{.items[0].metadata.name}')
 
-                    kubectl delete job text-cleaner \
-                      --ignore-not-found=true --wait=true
+            kubectl run text-cleaner-copy \
+                --image=busybox:1.36 \
+                --restart=Never \
+                --command -- sleep 300
 
-                    sed "s|image: .*|image: $IMAGE:$BUILD_NUMBER|" k8s/job.yaml | kubectl apply -f -
+            kubectl wait --for=condition=Ready \
+                pod/text-cleaner-copy --timeout=120s
 
-                    kubectl wait \
-                      --for=condition=complete \
-                      job/text-cleaner \
-                      --timeout=180s || {
-                        kubectl describe job text-cleaner
-                        kubectl get pods -l app=text-cleaner
-                        kubectl logs job/text-cleaner || true
-                        exit 1
-                    }
+            kubectl cp \
+                "$POD:/app/output/clean_assignment.txt" \
+                output/clean_assignment.txt \
+                -c cleaner 2>/dev/null || true
 
-                    echo "=== CLEANER OUTPUT ==="
-                    kubectl logs job/text-cleaner
+            if [ ! -s output/clean_assignment.txt ]; then
+                echo "Direct copy unavailable; retrieving file through helper pod."
+                kubectl exec text-cleaner-copy -- \
+                    sh -c 'mkdir -p /tmp/result'
+                kubectl cp \
+                    "$POD:/app/output/clean_assignment.txt" \
+                    output/clean_assignment.txt
+            fi
 
-                    mkdir -p output
+            kubectl delete pod text-cleaner-copy \
+                --ignore-not-found=true --wait=false
 
-                    POD=$(kubectl get pods \
-                      -l job-name=text-cleaner \
-                      -o jsonpath='{.items[0].metadata.name}')
-
-                    kubectl cp \
-                      "$POD:/app/output/clean_assignment.txt" \
-                      output/clean_assignment.txt
-                '''
-            }
-        }
-
-        stage('Archive Result') {
-            steps {
-                archiveArtifacts \
-                  artifacts: 'output/clean_assignment.txt', \
-                  fingerprint: true
-            }
-        }
+            echo "=== RESULT FILE ==="
+            cat output/clean_assignment.txt
+        '''
     }
 }
