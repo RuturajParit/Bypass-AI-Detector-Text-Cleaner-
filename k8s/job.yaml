@@ -14,7 +14,15 @@ spec:
       restartPolicy: Never
       containers:
         - name: cleaner
-          image: ruturajparit/cca2-text-cleaner:latest
+          image: DOCKERHUB_USERNAME/cca2-text-cleaner:latest
           imagePullPolicy: Always
           workingDir: /app
-          command: ["python", "-u", "src/cleaner.py"]
+          command:
+            - /bin/sh
+            - -c
+            - |
+              python -u src/cleaner.py
+              RESULT=$?
+              echo "CLEANER_EXIT_CODE=$RESULT"
+              sleep 120
+              exit "$RESULT"
