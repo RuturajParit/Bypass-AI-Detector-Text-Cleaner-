@@ -44,7 +44,7 @@ def main() -> None:
 
     removed = clean_file(input_file, output_file)
 
-    print("Cleaning complete!")
+    print("Cleaning complete! - CCA2 Run 2")
     print(f"Hidden Unicode characters removed: {removed}")
     print(f"Output file: {output_file}")
 
